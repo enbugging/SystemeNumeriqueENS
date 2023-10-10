@@ -33,6 +33,41 @@ let clear_marks g =
 let find_roots g =
   List.filter (fun n -> n.n_linked_by = []) g.g_nodes
 
-let has_cycle g = failwith "Graph.has_cycle: Non implementé"
+let has_cycle g = 
+  let rec dfs n = 
+    match n.n_mark with
+    | Visited -> ()
+    | InProgress -> raise Cycle
+    | NotVisited -> 
+      n.n_mark <- InProgress;
+      List.iter dfs n.n_link_to;
+      n.n_mark <- Visited
+  in
+  try 
+    clear_marks g;
+    List.iter dfs g.g_nodes;
+    false
+  with Cycle -> true
 
-let topological g = failwith "Graph.topological: Non implementé"
+let topological g =
+  let rec dfs q n = 
+    match n.n_mark with
+    | Visited -> ()
+    | InProgress -> raise Cycle
+    | NotVisited ->
+      n.n_mark <- InProgress;
+      List.iter (dfs q) n.n_link_to;
+      Stack.push n.n_label q;
+      n.n_mark <- Visited
+  in
+  try 
+    clear_marks g;
+    let q = Stack.create () in
+      List.iter (dfs q) (find_roots g);
+      List.iter (dfs q) (List.filter (fun n -> n.n_mark = NotVisited) g.g_nodes);
+      let l = ref [] in
+      while not (Stack.is_empty q) do
+        l := Stack.pop q :: !l
+      done;
+      List.rev !l
+  with Cycle -> raise Cycle
