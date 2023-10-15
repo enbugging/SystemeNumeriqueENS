@@ -36,9 +36,9 @@ type exp =
                 (* RAM addr_size word_size read_addr write_enable write_addr data *)
         | Econcat of arg * arg (* CONCAT a1 a2 : concatenation of arrays *)
         | Eslice of int * int * arg
-            (* SLICE i1 i2 a : extract the slice of a between indices i1 and i2 *)
+                (* SLICE i1 i2 a : extract the slice of a between indices i1 and i2 *)
         | Eselect of int * arg
-            (* SELECT i a : ith element of a *)
+                (* SELECT i a : ith element of a *)
 
 (* equations: x = exp *)
 type equation = ident * exp
