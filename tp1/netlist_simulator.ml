@@ -21,7 +21,7 @@ let print_state env p =
             match raw_output with
             | VBit b -> if b then "1" else "0"
             | VBitArray b -> String.of_seq (Array.to_seq (Array.map (fun x -> if x then '1' else '0') b))
-        in Printf.printf "%s = %s\n" input formatted_output
+        in Printf.printf "=> %s = %s\n" input formatted_output
     ) p.p_outputs
 
 let value_to_int (c : value) : int =
@@ -38,7 +38,7 @@ let array_combine arr1 arr2 =
         combined.(i) <- (arr1.(i), arr2.(i))
         done;
         combined
-let next_step (env : environment) ((iter, expr) : equation) : environment = 
+let next_step prev_env env (iter, expr) = 
 	try
         begin
             let vars = env.vars in 
@@ -58,7 +58,7 @@ let next_step (env : environment) ((iter, expr) : equation) : environment =
                 }
             | Ereg var -> 
                 {
-                    vars = StrMap.add iter (StrMap.find var vars) vars;
+                    vars = StrMap.add iter (StrMap.find var prev_env.vars) vars;
                     roms = roms;
                     rams = rams;
                 }
@@ -127,7 +127,7 @@ let next_step (env : environment) ((iter, expr) : equation) : environment =
             | Erom (addr_size, word_size, var) ->
                 let addr = value_to_int (get_value var) in
                 {
-                    vars = StrMap.add iter (IntMap.find addr roms) vars;
+                    vars = StrMap.add iter (IntMap.find addr prev_env.roms) vars;
                     roms = roms;
                     rams = rams;
                 }
@@ -142,7 +142,7 @@ let next_step (env : environment) ((iter, expr) : equation) : environment =
                         rams
                 in
                 {
-                    vars = StrMap.add iter (IntMap.find read_addr rams) vars;
+                    vars = StrMap.add iter (IntMap.find read_addr prev_env.rams) vars;
                     roms = roms;
                     rams = new_rams;
                 }
@@ -180,7 +180,7 @@ let next_step (env : environment) ((iter, expr) : equation) : environment =
                 let value = get_value var in
                 let new_value = 
                     match value with
-                    | VBit b -> failwith "Error: cannot select a bit"
+                    | VBit b -> if i > 0 then failwith "Error: there is only one bit to select" else VBit b
                     | VBitArray b -> VBit (Array.get b i)
                 in
                 {
@@ -197,24 +197,38 @@ let next_state initial_env p =
         try
             Printf.printf "%s ? " x;
             flush stdout;
+            let t = Env.find x p.p_vars in 
             let input = read_line () in 
-            if String.length input = 1 then 
+            if (String.length input = 1) then 
                 match input with 
-                | "0" -> VBit false
-                | "1" -> VBit true
+                | "0" -> if t = TBit then VBit false else VBitArray [|false|]
+                | "1" -> if t = TBit then VBit true else VBitArray [|true|]
                 | _ -> raise Wrong_input
             else 
-                VBitArray (Array.map (
-                    fun x -> 
-                        match x with 
-                        | '0' -> false
-                        | '1' -> true
-                        | _ -> raise Wrong_input)
-                    (input |> String.to_seq |> Array.of_seq))
+                match t with
+                | TBit -> raise Wrong_input
+                | TBitArray n ->
+                    let array =
+                        Array.map (
+                        fun x -> 
+                            match x with 
+                            | '0' -> false
+                            | '1' -> true
+                            | _ -> raise Wrong_input)
+                        (input |> String.to_seq |> Array.of_seq)
+                    in
+                    if Array.length array <> n
+                        then raise Wrong_input
+                    else VBitArray array
         with
             | Wrong_input ->
                 begin
                     print_string "Wrong input.\n";
+                    read_input x
+                end
+            | Not_found ->
+                begin
+                    print_string "Variable not found?! The simulator is faulty.\n";
                     read_input x
                 end
     in let initial_vars = 
@@ -226,7 +240,7 @@ let next_state initial_env p =
             roms = initial_env.roms;
             rams = initial_env.rams;
         }
-    in List.fold_left next_step new_env p.p_eqs
+    in List.fold_left (next_step initial_env) new_env p.p_eqs
 
 let simulate program number_steps = 
     (* Initialise an environment *)
@@ -238,17 +252,17 @@ let simulate program number_steps =
                 | TBitArray n -> StrMap.add id (VBitArray (Array.make n false)) m
         ) StrMap.empty (Env.bindings program.p_vars)
     in let initial_env = { vars = initial_vars; roms = IntMap.empty; rams = IntMap.empty }
-    in let rec simulator_aux p step_number maximum_number_of_steps = 
-		if maximum_number_of_steps - step_number = 0 then ()
+    in let rec simulator_aux env p step_number maximum_number_of_steps = 
+		if maximum_number_of_steps - step_number = -1 then ()
 		else 
 		begin
             Printf.printf "Step %d:\n" step_number;
             flush stdout;
-			let new_env = next_state initial_env p in
+			let new_env = next_state env p in
 			print_state new_env p;
-			simulator_aux p (step_number+1) maximum_number_of_steps;
+			simulator_aux new_env p (step_number+1) maximum_number_of_steps;
 		end
-	in simulator_aux program 1 number_steps
+	in simulator_aux initial_env program 1 number_steps
 
 let compile filename =
   try
