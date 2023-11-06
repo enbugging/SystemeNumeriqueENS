@@ -140,12 +140,10 @@ let next_step prev_env env (iter, expr) =
                 }
             | Eram (addr_size, word_size, read_addr, write_enable, write_addr, data) ->
                 let read_addr = value_to_int (get_value read_addr) in
-				Printf.printf "Read addr: %d \n" read_addr;
-                let write_enable = value_to_int (get_value write_enable) in
-				Printf.printf "Write enable: %d \n" write_enable;
-                let new_rams = 
+				        let write_enable = value_to_int (get_value write_enable) in
+				        let new_rams = 
                     if write_enable = 1 then
-						let write_addr = value_to_int (get_value write_addr) in
+				            		let write_addr = value_to_int (get_value write_addr) in
                         IntMap.add write_addr (get_value data) rams
                     else
                         rams
@@ -273,17 +271,29 @@ let simulate program number_steps =
 		end
 	in simulator_aux initial_env program 1 number_steps
 
+let print_only = ref false
+
 let compile filename =
   try
 	let raw_program = Netlist.read_file filename in
-	begin try
-		let scheduled_program = Scheduler.schedule raw_program in
-		simulate scheduled_program !number_steps;
-	  with
-		| Scheduler.Combinational_cycle ->
-			Format.eprintf "The netlist has a combinatory cycle.@.";
-	end;
-  with
+	let scheduled_program = Scheduler.schedule raw_program in
+  if !print_only then
+    let out_name = (Filename.chop_suffix filename ".net") ^ "_sch.net" in
+    let out = open_out out_name in
+    let close_all () =
+      close_out out
+    in
+    begin
+      Netlist_printer.print_program stdout scheduled_program;
+      close_all ()
+    end
+  else
+    try
+      simulate scheduled_program !number_steps;
+    with
+      | Scheduler.Combinational_cycle ->
+        Format.eprintf "The netlist has a combinatory cycle.@.";
+	with
 	| Netlist.Parse_error s -> 
 			begin
 				Format.eprintf "An error accurred: %s@." s;
@@ -292,7 +302,8 @@ let compile filename =
 
 let main () =
   Arg.parse
-	["-n", Arg.Set_int number_steps, "Number of steps to simulate"]
+	["-print", Arg.Set print_only, "Prints the netlist after scheduling";
+    "-n", Arg.Set_int number_steps, "Number of steps to simulate"]
 	compile
 	"";;
 
