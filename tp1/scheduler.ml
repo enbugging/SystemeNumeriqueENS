@@ -45,7 +45,8 @@ let schedule p =
   List.iter (fun (iter, expr) -> 
     match expr with
     | Ereg _ -> ()
-    | Eram _ -> ()
+    | Eram (_, _, ra, we, wa, _) -> 
+      List.iter (fun var -> add_edge graph var iter) (get_vars_from_args [ra; we; wa])
     | _ -> List.iter (fun var -> add_edge graph var iter) (read_exp (iter, expr))
   ) p.p_eqs;
   (* We then compute a topological sort of the graph *)
