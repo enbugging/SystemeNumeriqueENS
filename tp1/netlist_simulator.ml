@@ -38,6 +38,13 @@ let array_combine arr1 arr2 =
         combined.(i) <- (arr1.(i), arr2.(i))
         done;
         combined
+
+let read_ram rams word_size addr = 
+	try
+		IntMap.find addr rams
+	with
+		| Not_found -> VBitArray (Array.make word_size false)
+
 let next_step prev_env env (iter, expr) = 
 	try
         begin
@@ -47,7 +54,7 @@ let next_step prev_env env (iter, expr) =
             let get_value c = 
                 match c with 
                 | Aconst c -> c
-                | Avar v -> StrMap.find v vars
+                | Avar v -> StrMap.find v vars;
             in
             match expr with
             | Earg var -> 
@@ -133,16 +140,18 @@ let next_step prev_env env (iter, expr) =
                 }
             | Eram (addr_size, word_size, read_addr, write_enable, write_addr, data) ->
                 let read_addr = value_to_int (get_value read_addr) in
+				Printf.printf "Read addr: %d \n" read_addr;
                 let write_enable = value_to_int (get_value write_enable) in
-                let write_addr = value_to_int (get_value write_addr) in
+				Printf.printf "Write enable: %d \n" write_enable;
                 let new_rams = 
                     if write_enable = 1 then
+						let write_addr = value_to_int (get_value write_addr) in
                         IntMap.add write_addr (get_value data) rams
                     else
                         rams
                 in
                 {
-                    vars = StrMap.add iter (IntMap.find read_addr prev_env.rams) vars;
+                    vars = StrMap.add iter (read_ram new_rams word_size read_addr) vars;
                     roms = roms;
                     rams = new_rams;
                 }
