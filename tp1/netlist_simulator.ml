@@ -6,6 +6,12 @@ let number_steps = ref (-1)
 module StrMap = Map.Make(String)
 module IntMap = Map.Make(Int)
 
+exception Arrays_of_different_length of ident
+exception Incompatible_types of ident
+exception Variable_not_found of ident
+exception Cannot_slice_bit of ident
+exception Value_to_RAM_not_found
+
 type environment = 
     {
         vars : value StrMap.t;
@@ -97,14 +103,14 @@ let next_step prev_env (env, rams_to_write) (iter, expr) =
                     | (VBitArray b1, VBitArray b2) ->
                         begin
                             if Array.length b1 <> Array.length b2 
-                                then failwith "Error: bit arrays of different length"
+                                then raise (Arrays_of_different_length iter)
                             else match op with
                             | Or -> VBitArray (Array.map2 (fun x y -> x || y) b1 b2)
                             | Xor -> VBitArray (Array.map2 (fun x y -> x <> y) b1 b2)
                             | And -> VBitArray (Array.map2 (fun x y -> x && y) b1 b2)
                             | Nand -> VBitArray (Array.map2 (fun x y -> not (x && y)) b1 b2)
                         end
-                    | _ -> failwith "Error: incompatible types"
+                    | _ -> raise (Incompatible_types iter)
                 in
                 ({
                     vars = StrMap.add iter new_value vars;
@@ -122,9 +128,9 @@ let next_step prev_env (env, rams_to_write) (iter, expr) =
                             if b1 then VBit b2 else VBit b3
                         | (VBitArray b1, VBitArray b2, VBitArray b3) ->
                             VBitArray (Array.map2 (fun x (y, z) -> if x then y else z) b1 (array_combine b2 b3))
-                        | _ -> failwith "Error: incompatible types"
+                        | _ -> raise (Incompatible_types iter)
                     with 
-                        | Invalid_argument _ -> failwith "Error: bit arrays of different length"
+                        | Invalid_argument _ -> raise (Arrays_of_different_length iter)
                 in
                 ({
                     vars = StrMap.add iter new_value vars;
@@ -175,7 +181,7 @@ let next_step prev_env (env, rams_to_write) (iter, expr) =
                 let value = get_value var in
                 let new_value = 
                     match value with
-                    | VBit b -> failwith "Error: cannot slice a bit"
+                    | VBit b -> if i1 > 0 then raise (Cannot_slice_bit iter) else VBit b
                     | VBitArray b -> VBitArray (Array.sub b i1 (i2 - i1 + 1))
                 in
                 ({
@@ -187,7 +193,7 @@ let next_step prev_env (env, rams_to_write) (iter, expr) =
                 let value = get_value var in
                 let new_value = 
                     match value with
-                    | VBit b -> if i > 0 then failwith "Error: there is only one bit to select" else VBit b
+                    | VBit b -> if i > 0 then raise (Cannot_slice_bit iter) else VBit b
                     | VBitArray b -> VBit (Array.get b i)
                 in
                 ({
@@ -197,7 +203,10 @@ let next_step prev_env (env, rams_to_write) (iter, expr) =
                 }, rams_to_write)
         end
     with
-        | Not_found -> failwith "Error: variable not found"
+		| Arrays_of_different_length _ -> raise (Arrays_of_different_length iter)
+		| Incompatible_types _ -> raise (Incompatible_types iter)
+		| Cannot_slice_bit _ -> raise (Cannot_slice_bit iter)
+        | Not_found -> raise (Variable_not_found iter)
 let next_state initial_env p = 
     (* Read input from console *)
     let rec read_input x = 
@@ -264,8 +273,11 @@ let next_state initial_env p =
 				) env_without_written_ram.rams rams_to_write;
 		}
 	with
-		| Not_found -> failwith "Value to write to RAM not found.\n"
-		
+		| Not_found -> raise Value_to_RAM_not_found
+		| Arrays_of_different_length iter -> raise (Arrays_of_different_length iter)
+		| Incompatible_types iter -> raise (Incompatible_types iter)
+		| Cannot_slice_bit iter -> raise (Cannot_slice_bit iter)
+		| Variable_not_found iter -> raise (Variable_not_found iter)
 
 let simulate program number_steps = 
     (* Initialise an environment *)
@@ -292,37 +304,48 @@ let simulate program number_steps =
 let print_only = ref false
 
 let compile filename =
-  try
-	let raw_program = Netlist.read_file filename in
-	let scheduled_program = Scheduler.schedule raw_program in
-  if !print_only then
-    let out_name = (Filename.chop_suffix filename ".net") ^ "_sch.net" in
-    let out = open_out out_name in
-    let close_all () =
-      close_out out
-    in
-    begin
-      Netlist_printer.print_program stdout scheduled_program;
-      close_all ()
-    end
-  else
-    try
-      simulate scheduled_program !number_steps;
-    with
-      | Scheduler.Combinational_cycle ->
-        Format.eprintf "The netlist has a combinatory cycle.@.";
+	try
+		let raw_program = Netlist.read_file filename in
+		let scheduled_program = Scheduler.schedule raw_program in
+		if !print_only then
+			let out_name = (Filename.chop_suffix filename ".net") ^ "_sch.net" in
+			let out = open_out out_name in
+			let close_all () =
+			close_out out
+			in begin
+				Netlist_printer.print_program stdout scheduled_program;
+				close_all ()
+			end
+		else
+			simulate scheduled_program !number_steps;
 	with
-	| Netlist.Parse_error s -> 
+		| Netlist.Parse_error s -> 
 			begin
 				Format.eprintf "An error accurred: %s@." s;
 				exit 2
 			end
+		| Scheduler.Combinational_cycle ->
+			Format.eprintf "The netlist has a combinatory cycle.@."
+		| Scheduler.Variable_assigned_twice id ->
+			Format.eprintf "The variable %s is assigned twice.@." id
+		| Scheduler.Unknown_variable id ->
+			Format.eprintf "An unknown variable %s was found.@." id
+		| Value_to_RAM_not_found -> 
+			Format.eprintf "The value to write to the RAM was not found.@."
+		| Arrays_of_different_length id ->
+			Format.eprintf "The arrays in the expression for variable %s have different lengths.@." id
+		| Incompatible_types id ->
+			Format.eprintf "The types in the expression for variable %s are incompatible.@." id
+		| Cannot_slice_bit id ->
+			Format.eprintf "The expression %s cannot be sliced.@." id
+		| Variable_not_found id ->
+			Format.eprintf "The variable %s was not found.@." id
 
 let main () =
-  Arg.parse
-	["-print", Arg.Set print_only, "Prints the netlist after scheduling";
-    "-n", Arg.Set_int number_steps, "Number of steps to simulate"]
-	compile
-	"";;
+	Arg.parse
+		["-print", Arg.Set print_only, "Prints the netlist after scheduling";
+		"-n", Arg.Set_int number_steps, "Number of steps to simulate"]
+		compile
+		"";;
 
 main ()

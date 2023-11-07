@@ -2,6 +2,8 @@ open Netlist_ast
 open Graph
 
 exception Combinational_cycle
+exception Variable_assigned_twice of ident
+exception Unknown_variable of ident
 
 let get_args expr =
   match expr with
@@ -26,21 +28,21 @@ let read_exp (_, expr) = get_vars_from_args (get_args expr)
 
 let schedule p = 
   (* We make a dictionary associating a variable with a list of equations giving values to this variable *)
-  let dict = Hashtbl.create 16 in
+  let dict = Hashtbl.create 16 in 
+  Env.iter (fun k v -> Hashtbl.add dict k []) p.p_vars;
   List.iter (fun (iter, expr) -> 
-    List.iter (
-      fun var -> 
-        if not (Hashtbl.mem dict var) then Hashtbl.add dict var []
-    ) (get_vars_from_args (get_args expr));
-    if (Hashtbl.mem dict iter) then 
-      Hashtbl.replace dict iter ((iter, expr) :: (Hashtbl.find dict iter))
-    else
-      Hashtbl.add dict iter [(iter, expr)]
+    try 
+      let r = Hashtbl.find dict iter in
+        if r = [] then 
+          Hashtbl.add dict iter [(iter, expr)] 
+        else
+          raise (Variable_assigned_twice iter)
+    with
+      Not_found -> raise (Unknown_variable iter)
   ) p.p_eqs;
   (* We make a graph, first with nodes being the variables in the program...*)
-  let vars = Hashtbl.fold (fun k _ acc -> k :: acc) dict [] in 
   let graph = mk_graph () in 
-  List.iter (fun var -> add_node graph var) vars;
+  Env.iter (fun var ty -> add_node graph var) p.p_vars;
   (* ... then we add edges between variables that are used in the same equation *)
   List.iter (fun (iter, expr) -> 
     match expr with
