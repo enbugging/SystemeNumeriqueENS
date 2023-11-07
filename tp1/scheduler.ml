@@ -48,8 +48,17 @@ let schedule p =
     match expr with
     | Ereg _ -> ()
     | Eram (_, _, ra, we, wa, _) -> 
-      List.iter (fun var -> add_edge graph var iter) (get_vars_from_args [ra; we; wa])
-    | _ -> List.iter (fun var -> add_edge graph var iter) (read_exp (iter, expr))
+      List.iter (fun var -> 
+        if Hashtbl.mem dict var then add_edge graph var iter 
+        else raise (Unknown_variable var)
+      ) 
+      (get_vars_from_args [ra; we; wa])
+    | _ -> 
+      List.iter (fun var -> 
+        if Hashtbl.mem dict var then add_edge graph var iter 
+        else raise (Unknown_variable var)
+      )
+      (read_exp (iter, expr))
   ) p.p_eqs;
   (* We then compute a topological sort of the graph *)
   try
