@@ -15,4 +15,12 @@ The execution has basic interface, of the form `netlist_simulator.byte [-print] 
 
 As required, it can simulate circuits described in netlist language. I tried to implement the interface as close as possible to the provided prebuilt netlist simulator. Registers, RAM, and ROM are maintained using dictionary, so in particular, there is no hard limit for memory except that allowed for the simulator, at the expense of an additional log factor to the complexity. By default, all variables and memory are initialised to `0` or `False`. 
 	
-This convention does lead to the following behavior. When the scheduler is evoke, for the equation `RAM addr_size word_size read_addr write_enable write_addr write_data`, we only required that `read_addr`, `write_enable`, `write_addr`, i.e. read address, flag to switch from read to write, and write address, be calculated and well-defined, and leave `write_data`, if not calculated, by default to \texttt{False}.
+This convention does lead to the following behavior. When the scheduler is evoke, for the equation `RAM addr_size word_size read_addr write_enable write_addr write_data`, we only required that `read_addr`, `write_enable`, `write_addr`, i.e. read address, flag to switch from read to write, and write address, be calculated and well-defined.
+
+In addition to basic functionalities, the simulator is also capable of error handling with detailed messages, including detecting if 
+- there is a combinatorial cycle;
+- there is a variable assigned twice;
+- there is an unknown variable;
+- there is an ill-defined value to be written to RAM;
+- there is an operator with bad arguments;
+- there is an unknown error making variable not found.
