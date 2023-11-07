@@ -45,7 +45,7 @@ let read_ram rams word_size addr =
 	with
 		| Not_found -> VBitArray (Array.make word_size false)
 
-let next_step prev_env env (iter, expr) = 
+let next_step prev_env (env, rams_to_write) (iter, expr) = 
 	try
         begin
             let vars = env.vars in 
@@ -58,17 +58,17 @@ let next_step prev_env env (iter, expr) =
             in
             match expr with
             | Earg var -> 
-                {
+                ({
                     vars = StrMap.add iter (get_value var) vars;
                     roms = roms;
                     rams = rams;
-                }
+                }, rams_to_write)
             | Ereg var -> 
-                {
+                ({
                     vars = StrMap.add iter (StrMap.find var prev_env.vars) vars;
                     roms = roms;
                     rams = rams;
-                }
+                }, rams_to_write)
             | Enot var -> 
                 let old_value = get_value var in
                 let new_value = 
@@ -76,11 +76,11 @@ let next_step prev_env env (iter, expr) =
                     | VBit b -> VBit (not b)
                     | VBitArray b -> VBitArray (Array.map not b)
                 in
-                {
+                ({
                     vars = StrMap.add iter new_value vars;
                     roms = roms;
                     rams = rams;
-                } 
+                }, rams_to_write)
             | Ebinop (op, var1, var2) -> 
                 let value1 = get_value var1 in
                 let value2 = get_value var2 in
@@ -106,11 +106,11 @@ let next_step prev_env env (iter, expr) =
                         end
                     | _ -> failwith "Error: incompatible types"
                 in
-                {
+                ({
                     vars = StrMap.add iter new_value vars;
                     roms = roms;
                     rams = rams;
-                }
+                }, rams_to_write)
             | Emux (var1, var2, var3) ->
                 let value1 = get_value var1 in
                 let value2 = get_value var2 in
@@ -126,33 +126,33 @@ let next_step prev_env env (iter, expr) =
                     with 
                         | Invalid_argument _ -> failwith "Error: bit arrays of different length"
                 in
-                {
+                ({
                     vars = StrMap.add iter new_value vars;
                     roms = roms;
                     rams = rams;
-                }
+                }, rams_to_write)
             | Erom (addr_size, word_size, var) ->
                 let addr = value_to_int (get_value var) in
-                {
+                ({
                     vars = StrMap.add iter (IntMap.find addr prev_env.roms) vars;
                     roms = roms;
                     rams = rams;
-                }
+                }, rams_to_write)
             | Eram (addr_size, word_size, read_addr, write_enable, write_addr, data) ->
                 let read_addr = value_to_int (get_value read_addr) in
-				        let write_enable = value_to_int (get_value write_enable) in
-				        let new_rams = 
+				let write_enable = value_to_int (get_value write_enable) in
+				let new_rams_to_write = 
                     if write_enable = 1 then
-				            		let write_addr = value_to_int (get_value write_addr) in
-                        IntMap.add write_addr (get_value data) rams
+				        let write_addr = value_to_int (get_value write_addr) in
+                        (write_addr, data)::rams_to_write
                     else
-                        rams
+                        rams_to_write
                 in
-                {
-                    vars = StrMap.add iter (read_ram new_rams word_size read_addr) vars;
+                ({
+                    vars = StrMap.add iter (read_ram rams word_size read_addr) vars;
                     roms = roms;
-                    rams = new_rams;
-                }
+                    rams = rams;
+                }, new_rams_to_write)
             | Econcat (var1, var2) ->
                 let value1 = get_value var1 in
                 let value2 = get_value var2 in
@@ -166,11 +166,11 @@ let next_step prev_env env (iter, expr) =
                     | VBit b -> [|b|]
                     | VBitArray b -> b
                 in 
-                {
+                ({
                     vars = StrMap.add iter (VBitArray (Array.append array1 array2)) vars;
                     roms = roms;
                     rams = rams;
-                }
+                }, rams_to_write)
             | Eslice (i1, i2, var) ->
                 let value = get_value var in
                 let new_value = 
@@ -178,11 +178,11 @@ let next_step prev_env env (iter, expr) =
                     | VBit b -> failwith "Error: cannot slice a bit"
                     | VBitArray b -> VBitArray (Array.sub b i1 (i2 - i1 + 1))
                 in
-                {
+                ({
                     vars = StrMap.add iter new_value vars;
                     roms = roms;
                     rams = rams;
-                }
+                }, rams_to_write)
             | Eselect (i, var) ->
                 let value = get_value var in
                 let new_value = 
@@ -190,11 +190,11 @@ let next_step prev_env env (iter, expr) =
                     | VBit b -> if i > 0 then failwith "Error: there is only one bit to select" else VBit b
                     | VBitArray b -> VBit (Array.get b i)
                 in
-                {
+                ({
                     vars = StrMap.add iter new_value vars;
                     roms = roms;
                     rams = rams;
-                }
+                }, rams_to_write)
         end
     with
         | Not_found -> failwith "Error: variable not found"
@@ -241,13 +241,31 @@ let next_state initial_env p =
     in let initial_vars = 
         List.fold_left (fun y x -> StrMap.add x (read_input x) y) initial_env.vars p.p_inputs  
     (* Execute through the program *)
-    in let new_env = 
+    in let env_with_input = 
         {
             vars = initial_vars;
             roms = initial_env.roms;
             rams = initial_env.rams;
         }
-    in List.fold_left (next_step initial_env) new_env p.p_eqs
+    in try
+		let (env_without_written_ram, rams_to_write) = List.fold_left (next_step env_with_input) (env_with_input, []) p.p_eqs in
+		{
+			vars = env_without_written_ram.vars;
+			roms = env_without_written_ram.roms;
+			rams = List.fold_left (
+				fun old_ram (addr, var) -> 
+					let get_value c = 
+						match c with 
+						| Aconst c -> c
+						| Avar v -> StrMap.find v env_without_written_ram.vars;
+					in
+					let value = get_value var in 
+					IntMap.add addr value old_ram
+				) env_without_written_ram.rams rams_to_write;
+		}
+	with
+		| Not_found -> failwith "Value to write to RAM not found.\n"
+		
 
 let simulate program number_steps = 
     (* Initialise an environment *)
