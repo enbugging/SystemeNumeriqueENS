@@ -206,7 +206,7 @@ let next_step prev_env (env, rams_to_write) (iter, expr) =
 		| Arrays_of_different_length _ -> raise (Arrays_of_different_length iter)
 		| Incompatible_types _ -> raise (Incompatible_types iter)
 		| Cannot_slice_bit _ -> raise (Cannot_slice_bit iter)
-        | Not_found -> raise (Variable_not_found iter)
+		| Not_found -> raise (Variable_not_found iter)
 let next_state initial_env p = 
     (* Read input from console *)
     let rec read_input x = 
@@ -313,7 +313,7 @@ let compile filename =
 			let close_all () =
 			close_out out
 			in begin
-				Netlist_printer.print_program stdout scheduled_program;
+				Netlist_printer.print_program out scheduled_program;
 				close_all ()
 			end
 		else
