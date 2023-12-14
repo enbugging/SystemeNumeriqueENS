@@ -126,8 +126,10 @@ let next_step prev_env (env, rams_to_write) (iter, expr) =
                         match (value1, value2, value3) with
                         | (VBit b1, VBit b2, VBit b3) -> 
                             if b1 then VBit b3 else VBit b2
-                        | (VBitArray b1, VBitArray b2, VBitArray b3) ->
-                            VBitArray (Array.map2 (fun x (y, z) -> if x then z else y) b1 (array_combine b2 b3))
+                        | (VBit b1, VBitArray b2, VBitArray b3) ->
+                            if Array.length b2 <> Array.length b3 
+                                then raise (Arrays_of_different_length iter)
+                            else if b1 then VBitArray b3 else VBitArray b2
                         | _ -> raise (Incompatible_types iter)
                     with 
                         | Invalid_argument _ -> raise (Arrays_of_different_length iter)
