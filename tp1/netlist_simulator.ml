@@ -27,7 +27,10 @@ let print_state env p =
             match raw_output with
             | VBit b -> if b then "1" else "0"
             | VBitArray b -> String.of_seq (Array.to_seq (Array.map (fun x -> if x then '1' else '0') b))
-        in Printf.printf "=> %s = %s\n" input formatted_output
+        in begin
+          Printf.printf "=> %s = %s\n" input formatted_output;
+          flush stdout
+        end
     ) p.p_outputs
 
 let value_to_int (c : value) : int =
