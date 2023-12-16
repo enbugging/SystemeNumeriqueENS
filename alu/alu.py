@@ -38,7 +38,7 @@ def alu(a, b, op):
     s_sub = n_subtractor(a, b)
     s_and = n_and(a, b)
     s_or = n_or(a, b)
-    s_xor = n_xor(a, b)
+    s_xor = constant.z_32 #n_xor(a, b)
     s_sll = n_sll(a, b)
     s_srl = n_srl(a, b)
 

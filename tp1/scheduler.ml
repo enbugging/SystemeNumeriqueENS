@@ -53,6 +53,33 @@ let schedule p =
         else raise (Unknown_variable var)
       ) 
       (get_vars_from_args [ra; we; wa])
+    | Enot a -> 
+      begin
+        increment graph iter;
+        List.iter (fun var -> 
+          if Hashtbl.mem dict var then add_edge graph var iter 
+          else raise (Unknown_variable var)
+        )
+        (get_vars_from_args [a])
+      end
+    | Ebinop (_, a, b) ->
+      begin
+        increment graph iter;
+        List.iter (fun var -> 
+          if Hashtbl.mem dict var then add_edge graph var iter 
+          else raise (Unknown_variable var)
+        )
+        (get_vars_from_args [a; b])
+      end
+    | Emux (a, b, c) ->
+      begin
+        increment graph iter;
+        List.iter (fun var -> 
+          if Hashtbl.mem dict var then add_edge graph var iter 
+          else raise (Unknown_variable var)
+        )
+        (get_vars_from_args [a; b; c])
+      end
     | _ -> 
       List.iter (fun var -> 
         if Hashtbl.mem dict var then add_edge graph var iter 

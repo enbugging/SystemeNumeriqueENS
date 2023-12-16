@@ -58,7 +58,7 @@ let topological g =
     | NotVisited ->
       n.n_mark <- InProgress;
       List.iter (dfs q) n.n_link_to;
-      n.n_critical_path <- 1 + List.fold_left (fun acc n -> max acc n.n_critical_path) 0 n.n_link_to;
+      n.n_critical_path <- n.n_critical_path + List.fold_left (fun acc n -> max acc n.n_critical_path) 0 n.n_link_to;
       Stack.push n.n_label q;
       n.n_mark <- Visited
   in
@@ -73,3 +73,7 @@ let topological g =
       done;
       List.rev !l
   with Cycle -> raise Cycle
+
+let increment g v =
+  let n = node_of_label g v in
+  n.n_critical_path <- n.n_critical_path + 1
