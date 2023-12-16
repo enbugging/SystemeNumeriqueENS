@@ -44,6 +44,7 @@ let schedule p =
   let graph = mk_graph () in 
   Env.iter (fun var ty -> add_node graph var) p.p_vars;
   (* ... then we add edges between variables that are used in the same equation *)
+  let logic_gates = ref 0 in 
   List.iter (fun (iter, expr) -> 
     match expr with
     | Ereg _ -> ()
@@ -56,6 +57,7 @@ let schedule p =
     | Enot a -> 
       begin
         increment graph iter;
+        logic_gates := !logic_gates + 1;
         List.iter (fun var -> 
           if Hashtbl.mem dict var then add_edge graph var iter 
           else raise (Unknown_variable var)
@@ -65,6 +67,7 @@ let schedule p =
     | Ebinop (_, a, b) ->
       begin
         increment graph iter;
+        logic_gates := !logic_gates + 1;
         List.iter (fun var -> 
           if Hashtbl.mem dict var then add_edge graph var iter 
           else raise (Unknown_variable var)
@@ -74,6 +77,7 @@ let schedule p =
     | Emux (a, b, c) ->
       begin
         increment graph iter;
+        logic_gates := !logic_gates + 1;
         List.iter (fun var -> 
           if Hashtbl.mem dict var then add_edge graph var iter 
           else raise (Unknown_variable var)
@@ -91,7 +95,7 @@ let schedule p =
   try
     let sorted_vars = topological graph in
     let critical_length = List.fold_left (fun acc n -> max acc n.n_critical_path) 0 graph.g_nodes in
-    Printf.printf "Number of variables: %d\nCritical path length: %d\n" (List.length sorted_vars) critical_length;
+    Printf.printf "Number of variables: %d\nCritical path length: %d\n" !logic_gates critical_length;
     {
       p_eqs = List.concat (List.map (Hashtbl.find dict) sorted_vars);
       p_vars = p.p_vars;
