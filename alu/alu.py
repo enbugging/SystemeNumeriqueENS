@@ -21,6 +21,7 @@ import sys
 sys.path.append("..")
 
 from lib_carotte import *
+import alu.constant as constant
 from alu.add_and_subtract import *
 from alu.and_or_xor import *
 from alu.left_shift import *
@@ -30,8 +31,9 @@ def alu(a, b, op):
     assert(a.bus_size == 32)
     assert(b.bus_size == 32)
     assert(op.bus_size == 3)
-    zero_flag = Constant("0")
 
+    zero_flag = constant.z_1
+    
     s_add = n_adder(a, b)
     s_sub = n_subtractor(a, b)
     s_and = n_and(a, b)
@@ -40,7 +42,7 @@ def alu(a, b, op):
     s_sll = n_sll(a, b)
     s_srl = n_srl(a, b)
 
-    s_2b1 = Mux(op[2], Constant("00000000000000000000000000000000"), s_add)
+    s_2b1 = Mux(op[2], constant.z_32, s_add)
     s_2b2 = Mux(op[2], s_sub, s_and)
     s_2b3 = Mux(op[2], s_or, s_xor)
     s_2b4 = Mux(op[2], s_sll, s_srl)
@@ -58,6 +60,13 @@ def main():
     a = Input(32)
     b = Input(32)
     op = Input(3)
+
+    constant.z_1 = Constant("0")
+    constant.z_2 = Constant("00")
+    constant.z_4 = Constant("0000")
+    constant.z_8 = Constant("00000000")
+    constant.z_16 = Constant("0000000000000000")
+    constant.z_32 = Constant("00000000000000000000000000000000")
 
     (result, flag_z) = alu(a, b, op)
     result.set_as_output("result")
