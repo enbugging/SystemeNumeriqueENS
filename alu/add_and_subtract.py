@@ -43,7 +43,7 @@ def carry_lookahead_adder(a, b, c, stage=5):
         p = p & p_i
         g = g_i | (p_i & g)
         s = s + s_i
-        flag_nz = flag_nz & flag_nz_i
+        flag_nz = flag_nz | flag_nz_i
     return (s, g | (p & c), p, g, flag_nz)
 
 def adder(a, b):
@@ -59,4 +59,4 @@ def subtractor(a, b):
     for i in range(1, b.bus_size):
         not_b = not_b + (~b[i])
     (s, _, _, _, flag_nz) = carry_lookahead_adder(a, not_b, ~constant.z_1)
-    return (s, flag_nz)
+    return (s, ~flag_nz)

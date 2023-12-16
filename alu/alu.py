@@ -81,4 +81,3 @@ def main():
     (result, flag_z) = alu(a, b, op)
     result.set_as_output("result")
     flag_z.set_as_output("flag_z")
-
