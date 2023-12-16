@@ -8,12 +8,13 @@ and 'a node = {
   mutable n_mark : mark;
   mutable n_link_to : 'a node list;
   mutable n_linked_by : 'a node list;
+  mutable n_critical_path : int;
 }
 
 let mk_graph () = { g_nodes = [] }
 
 let add_node g x =
-  let n = { n_label = x; n_mark = NotVisited; n_link_to = []; n_linked_by = [] } in
+  let n = { n_label = x; n_mark = NotVisited; n_link_to = []; n_linked_by = []; n_critical_path = 0; } in
   g.g_nodes <- n :: g.g_nodes
 
 let node_of_label g x =
@@ -57,6 +58,7 @@ let topological g =
     | NotVisited ->
       n.n_mark <- InProgress;
       List.iter (dfs q) n.n_link_to;
+      n.n_critical_path <- 1 + List.fold_left (fun acc n -> max acc n.n_critical_path) 0 n.n_link_to;
       Stack.push n.n_label q;
       n.n_mark <- Visited
   in
