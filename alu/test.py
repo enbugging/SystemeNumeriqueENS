@@ -61,7 +61,8 @@ def gen_test_case():
 cnt = 0
 for _ in range(num_tests):
     solution_process = subprocess.Popen(solution_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    c = solution_process.stdout.readline()
+    c1 = solution_process.stdout.readline()
+    c2 = solution_process.stdout.readline()
 
     for _ in range(num_ops):
         # Generate a test case
@@ -99,4 +100,4 @@ for _ in range(num_tests):
             signal.alarm(0)
     # Close subprocesses after all interactions for this test case
     solution_process.kill()
-print(c + "Passed {} out of {} tests".format(cnt, num_tests * num_ops))
+print(c1 + c2 + "Passed {} out of {} tests".format(cnt, num_tests * num_ops))

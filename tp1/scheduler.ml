@@ -64,7 +64,7 @@ let schedule p =
   try
     let sorted_vars = topological graph in
     let critical_length = List.fold_left (fun acc n -> max acc n.n_critical_path) 0 graph.g_nodes in
-    Printf.printf "Critical path length: %d\n" critical_length;
+    Printf.printf "Number of logic gates: %d\nCritical path length: %d\n" (List.length sorted_vars) critical_length;
     {
       p_eqs = List.concat (List.map (Hashtbl.find dict) sorted_vars);
       p_vars = p.p_vars;
