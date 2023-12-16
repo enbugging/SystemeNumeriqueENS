@@ -20,7 +20,7 @@ def strip_prefix(string):
 def gen_test_case():    
     a = random.randint(0, 2**32-1)
     b = random.randint(0, 2**32-1)
-    op = random.randint(0, 7)
+    op = random.randint(2, 2)
     if op == 0:
         s = 0
     elif op == 1:

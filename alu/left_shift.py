@@ -67,4 +67,12 @@ def n_sll(a, b):
     a = Mux(b[1], left_shift_2(a), a)
     a = Mux(b[0], left_shift_1(a), a)
     a = Mux(c031, a, constant.z_32)
-    return a
+
+    def and_acculumator(a):
+        sz = a.bus_size
+        if sz == 1:
+            return a[0]
+        else:
+            return and_acculumator(a[sz//2-1]) & and_acculumator(a[sz//2:])
+            
+    return (a, ~and_acculumator(a))
