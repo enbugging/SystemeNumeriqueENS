@@ -1,6 +1,7 @@
 open Netlist_ast
 exception Wrong_input
 let print_only = ref false
+let print_first_words_of_ram = ref false
 let number_steps = ref (-1)
 
 module StrMap = Map.Make(String)
@@ -23,20 +24,31 @@ let print_state env p =
     List.iter (
         fun input ->
             let raw_output = StrMap.find input env.vars
-        in let formatted_output = 
-            match raw_output with
-            | VBit b -> if b then "1" else "0"
-            | VBitArray b -> String.of_seq (Array.to_seq (Array.map (fun x -> if x then '1' else '0') b))
-        in begin
-          Printf.printf "=> %s = %s\n" input formatted_output;
-          flush stdout
-        end
+			in let formatted_output = 
+				match raw_output with
+				| VBit b -> if b then "1" else "0"
+				| VBitArray b -> String.of_seq (Array.to_seq (Array.map (fun x -> if x then '1' else '0') b))
+			in
+			begin
+				Printf.printf "=> %s = %s\n" input formatted_output;
+				flush stdout
+			end
     ) p.p_outputs
 
 let value_to_int (c : value) : int =
     match c with 
     | VBit b -> if b then 1 else 0
-    | VBitArray b -> Array.fold_left (fun x y -> if y then x*2 else x*2 + 1) 0 b
+    | VBitArray b -> Array.fold_left (fun x y -> if y then x*2+1 else x*2) 0 b
+  
+let print_ram env =
+	List.iter (
+		fun addr ->
+    	try 
+			  let v = IntMap.find addr env.rams in 
+			  Printf.printf "%08X\n" (value_to_int v)
+      with
+        | Not_found -> Printf.printf "%08X\n" 0
+	) [0; 1; 2; 3; 4; 5; 6; 7; 8; 9; 10; 11; 12; 13; 14; 15]
 
 let array_combine arr1 arr2 =
     if Array.length arr1 <> Array.length arr2 then
@@ -298,15 +310,16 @@ let simulate program number_steps =
 		if maximum_number_of_steps - step_number = -1 then ()
 		else 
 		begin
-            Printf.printf "Step %d:\n" step_number;
-            flush stdout;
-			let new_env = next_state env p in
-			print_state new_env p;
-			simulator_aux new_env p (step_number+1) maximum_number_of_steps;
+      Printf.printf "Step %d:\n" step_number;
+      flush stdout;
+      let new_env = next_state env p in 
+        if !print_first_words_of_ram then
+        	print_ram new_env
+        else
+        	print_state new_env p;
+		simulator_aux new_env p (step_number+1) maximum_number_of_steps;
 		end
 	in simulator_aux initial_env program 1 number_steps
-
-let print_only = ref false
 
 let compile filename =
 	try
@@ -349,7 +362,8 @@ let compile filename =
 let main () =
 	Arg.parse
 		["-print", Arg.Set print_only, "Prints the netlist after scheduling";
-		"-n", Arg.Set_int number_steps, "Number of steps to simulate"]
+		"-n", Arg.Set_int number_steps, "Number of steps to simulate";
+		"-print_ram", Arg.Set print_first_words_of_ram, "Prints the first sixteen words in RAM"]
 		compile
 		"";;
 
